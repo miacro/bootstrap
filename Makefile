@@ -15,7 +15,8 @@ all: dotfiles bootstrap utils emacs.d system-config vim.d \
 	@echo "done"
 
 dotfiles: 
-	@make ${MAKE_OPTIONS} REPO_NAME=dotfiles  prepare-repo
+	@make ${MAKE_OPTIONS} REPO_NAME=dotfiles  prepare-repo \
+	&& make ${MAKE_OPTIONS} -C ${CACHE_DIR}/dotfiles
 
 bootstrap: 
 	@make ${MAKE_OPTIONS} REPO_NAME=bootstrap prepare-repo
