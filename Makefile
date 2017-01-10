@@ -10,7 +10,8 @@ nothing:
 	@echo ""
 
 all: dotfiles bootstrap utils emacs.d system-config vim.d \
-	   stumpwm.d nginx.d awesome.d miacropp online-judge
+	   stumpwm.d nginx.d sudoku lisp-koans awesome.d miacropp \
+		 online-judge mlisp
 	@echo "done"
 
 dotfiles: 
@@ -36,6 +37,15 @@ stumpwm.d:
 
 nginx.d: 
 	@make ${MAKE_OPTIONS} REPO_NAME=nginx.d prepare-repo
+
+sudoku: 
+	@make ${MAKE_OPTIONS} REPO_NAME=sudoku prepare-repo
+
+mlisp: 
+	@make ${MAKE_OPTIONS} REPO_NAME=mlisp prepare-repo
+
+lisp-koans: 
+	@make ${MAKE_OPTIONS} REPO_NAME=lisp-koans prepare-repo
 
 awesome.d: 
 	@make ${MAKE_OPTIONS} REPO_NAME=awesome.d prepare-repo
