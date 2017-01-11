@@ -22,10 +22,12 @@ bootstrap:
 	@  ${MAKE} REPO_NAME=bootstrap prepare-repo
 
 utils: 
-	@  ${MAKE} REPO_NAME=utils prepare-repo
+	@  ${MAKE} REPO_NAME=utils prepare-repo \
+	&& ${MAKE} -C ${CACHE_DIR}/utils
 
 emacs.d: 
-	@  ${MAKE} REPO_NAME=emacs.d prepare-repo
+	@  ${MAKE} REPO_NAME=emacs.d prepare-repo \
+	&& ${MAKE} -C ${CACHE_DIR}/emacs.d
 
 system-config: 
 	@  ${MAKE} REPO_NAME=system-config prepare-repo
