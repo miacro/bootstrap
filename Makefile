@@ -9,7 +9,7 @@ MAKE=make --no-print-directory
 nothing:
 	@  exit 0
 
-all: dotfiles bootstrap utils emacs.me system-config vim.d \
+all: dotfiles bootstrap utils emacs.me system-config vim.me \
 	   stumpwm.d nginx.d sudoku lisp-koans awesome.d miacropp \
 		 online-judge mlisp
 	@ exit 0
@@ -32,9 +32,9 @@ emacs.me:
 system-config: 
 	@  ${MAKE} REPO_NAME=system-config prepare-repo
 
-vim.d: 
-	@  ${MAKE} REPO_NAME=vim.d prepare-repo \
-	&& ${MAKE} -C ${CACHE_DIR}/vim.d
+vim.me: 
+	@  ${MAKE} REPO_NAME=vim.me prepare-repo \
+	&& ${MAKE} -C ${CACHE_DIR}/vim.me
 
 stumpwm.d: 
 	@  ${MAKE} REPO_NAME=stumpwm.d prepare-repo \
