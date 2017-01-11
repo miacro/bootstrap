@@ -4,82 +4,82 @@ CACHE_DIR=`pwd`/repository
 GIT_BASE_URI="git@github.com:miacro"
 REPO_NAME=""
 INSTALL_DIR=${HOME}
-MAKE_OPTIONS="--no-print-directory"
+MAKE=make --no-print-directory
 
 nothing:
-	@echo ""
+	@  exit 0
 
 all: dotfiles bootstrap utils emacs.d system-config vim.d \
 	   stumpwm.d nginx.d sudoku lisp-koans awesome.d miacropp \
 		 online-judge mlisp
-	@echo "done"
+	@ exit 0
 
 dotfiles: 
-	@make ${MAKE_OPTIONS} REPO_NAME=dotfiles  prepare-repo \
-	&& make ${MAKE_OPTIONS} -C ${CACHE_DIR}/dotfiles
+	@  ${MAKE} REPO_NAME=dotfiles  prepare-repo \
+	&& ${MAKE} -C ${CACHE_DIR}/dotfiles
 
 bootstrap: 
-	@make ${MAKE_OPTIONS} REPO_NAME=bootstrap prepare-repo
+	@  ${MAKE} REPO_NAME=bootstrap prepare-repo
 
 utils: 
-	@make ${MAKE_OPTIONS} REPO_NAME=utils prepare-repo
+	@  ${MAKE} REPO_NAME=utils prepare-repo
 
 emacs.d: 
-	@make ${MAKE_OPTIONS} REPO_NAME=emacs.d prepare-repo
+	@  ${MAKE} REPO_NAME=emacs.d prepare-repo
 
 system-config: 
-	@make ${MAKE_OPTIONS} REPO_NAME=system-config prepare-repo
+	@  ${MAKE} REPO_NAME=system-config prepare-repo
 
 vim.d: 
-	@make ${MAKE_OPTIONS} REPO_NAME=vim.d prepare-repo
+	@  ${MAKE} REPO_NAME=vim.d prepare-repo
 
 stumpwm.d: 
-	@make ${MAKE_OPTIONS} REPO_NAME=stumpwm.d prepare-repo
+	@  ${MAKE} REPO_NAME=stumpwm.d prepare-repo
 
 nginx.d: 
-	@make ${MAKE_OPTIONS} REPO_NAME=nginx.d prepare-repo
+	@  ${MAKE} REPO_NAME=nginx.d prepare-repo
 
 sudoku: 
-	@make ${MAKE_OPTIONS} REPO_NAME=sudoku prepare-repo
+	@  ${MAKE} REPO_NAME=sudoku prepare-repo
 
 mlisp: 
-	@make ${MAKE_OPTIONS} REPO_NAME=mlisp prepare-repo
+	@  ${MAKE} REPO_NAME=mlisp prepare-repo
 
 lisp-koans: 
-	@make ${MAKE_OPTIONS} REPO_NAME=lisp-koans prepare-repo
+	@  ${MAKE} REPO_NAME=lisp-koans prepare-repo
 
 awesome.d: 
-	@make ${MAKE_OPTIONS} REPO_NAME=awesome.d prepare-repo
+	@  ${MAKE} REPO_NAME=awesome.d prepare-repo
 
 miacropp: 
-	@make ${MAKE_OPTIONS} REPO_NAME=miacropp prepare-repo
-
+	@  ${MAKE} REPO_NAME=miacropp prepare-repo
+ 
 online-judge: 
-	@make ${MAKE_OPTIONS} REPO_NAME=online-judge prepare-repo
+	@  ${MAKE} REPO_NAME=online-judge prepare-repo
 
 # component
 reinstall:
-	@stow -d ${CACHE_DIR} -t ${INSTALL_DIR} -R ${REPO_NAME}
+	@  stow -d ${CACHE_DIR} -t ${INSTALL_DIR} -R ${REPO_NAME}
 
 install:
-	@stow -d ${CACHE_DIR} -t ${INSTALL_DIR} ${REPO_NAME}
+	@  stow -d ${CACHE_DIR} -t ${INSTALL_DIR} ${REPO_NAME}
 
 uninstall:
-	@stow -d ${CACHE_DIR} -t ${INSTALL_DIR} -D ${REPO_NAME}
+	@  stow -d ${CACHE_DIR} -t ${INSTALL_DIR} -D ${REPO_NAME}
 
 prepare-cache-dir:
-	@[[ -d ${CACHE_DIR} ]] || mkdir -p ${CACHE_DIR}
+	@  [[ -d ${CACHE_DIR} ]] || mkdir -p ${CACHE_DIR}
 
 clone-repo: prepare-cache-dir
 	git clone ${GIT_BASE_URI}/${REPO_NAME} ${CACHE_DIR}/${REPO_NAME}
 
 update-repo: prepare-cache-dir
-	@cd ${CACHE_DIR}/${REPO_NAME} && git pull
+	@  cd ${CACHE_DIR}/${REPO_NAME} && git pull
 
 prepare-repo:
-	@[[ -d ${CACHE_DIR}/${REPO_NAME}/.git ]] \
-		&& make update-repo \
-		|| make clone-repo
+	@  [[ -d ${CACHE_DIR}/${REPO_NAME}/.git ]] \
+	&& ${MAKE} update-repo \
+	|| ${MAKE} clone-repo
 
 .PHONY: nothing prepare-cache-dir clone-repo update-repo prepare-repo 
 
