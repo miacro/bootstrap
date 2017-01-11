@@ -34,7 +34,10 @@ vim.d:
 	@  ${MAKE} REPO_NAME=vim.d prepare-repo
 
 stumpwm.d: 
-	@  ${MAKE} REPO_NAME=stumpwm.d prepare-repo
+	@  ${MAKE} REPO_NAME=stumpwm.d prepare-repo \
+	&& [[ ! -L ${INSTALL_DIR}/.stumpwm.d ]] && [[ ! -d ${INSTALL_DIR}/.stumpwm.d ]] \
+	&& ln -s ${CACHE_DIR}/stumpwm.d ${INSTALL_DIR}/.stumpwm.d \
+	|| exit 0
 
 nginx.d: 
 	@  ${MAKE} REPO_NAME=nginx.d prepare-repo
