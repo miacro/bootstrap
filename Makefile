@@ -9,7 +9,7 @@ MAKE=make --no-print-directory
 nothing:
 	@  exit 0
 
-all: dotfiles bootstrap utils emacs.d system-config vim.d \
+all: dotfiles bootstrap utils emacs.me system-config vim.d \
 	   stumpwm.d nginx.d sudoku lisp-koans awesome.d miacropp \
 		 online-judge mlisp
 	@ exit 0
@@ -25,9 +25,9 @@ utils:
 	@  ${MAKE} REPO_NAME=utils prepare-repo \
 	&& ${MAKE} -C ${CACHE_DIR}/utils
 
-emacs.d: 
-	@  ${MAKE} REPO_NAME=emacs.d prepare-repo \
-	&& ${MAKE} -C ${CACHE_DIR}/emacs.d
+emacs.me: 
+	@  ${MAKE} REPO_NAME=emacs.me prepare-repo \
+	&& ${MAKE} -C ${CACHE_DIR}/emacs.me
 
 system-config: 
 	@  ${MAKE} REPO_NAME=system-config prepare-repo
