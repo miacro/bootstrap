@@ -31,14 +31,12 @@ system-config:
 	@  ${MAKE} REPO_NAME=system-config prepare-repo
 
 vim.d: 
-	@  ${MAKE} REPO_NAME=vim.d prepare-repo
+	@  ${MAKE} REPO_NAME=vim.d prepare-repo \
+	&& ${MAKE} -C ${CACHE_DIR}/vim.d
 
 stumpwm.d: 
 	@  ${MAKE} REPO_NAME=stumpwm.d prepare-repo \
-	&& [[ ! -L ${INSTALL_DIR}/.stumpwm.d ]] && [[ ! -d ${INSTALL_DIR}/.stumpwm.d ]] \
-	&& ln -s ${CACHE_DIR}/stumpwm.d ${INSTALL_DIR}/.stumpwm.d \
-	|| exit 0
-
+  && ${MAKE} -C ${CACHE_DIR}/stumpwm.d
 nginx.d: 
 	@  ${MAKE} REPO_NAME=nginx.d prepare-repo
 
