@@ -4,72 +4,32 @@ CACHE_DIR=`pwd`/repository
 GIT_BASE_URI="git@github.com:miacro"
 REPO_NAME=""
 INSTALL_DIR=${HOME}
+TARGET=reinstall
 MAKE=make --no-print-directory
 
-nothing:
-	@  exit 0
+install:
+	@  [[ ! -n ${REPO_NAME} ]] \
+	&& echo "unspecified REPO_NAME" \
+	&& exit 0 \
+	|| ${MAKE} install-repo
 
-all: dotfiles bootstrap utils emacs.me system-config vim.me \
-	   stumpwm.d nginx.d sudoku lisp-koans awesome.d miacropp \
-		 online-judge mlisp
-	@ exit 0
-
-dotfiles: 
-	@  ${MAKE} REPO_NAME=dotfiles  prepare-repo \
-	&& ${MAKE} -C ${CACHE_DIR}/dotfiles
-
-bootstrap: 
-	@  ${MAKE} REPO_NAME=bootstrap prepare-repo
-
-utils: 
-	@  ${MAKE} REPO_NAME=utils prepare-repo \
-	&& ${MAKE} -C ${CACHE_DIR}/utils
-
-emacs.me: 
-	@  ${MAKE} REPO_NAME=emacs.me prepare-repo \
-	&& ${MAKE} -C ${CACHE_DIR}/emacs.me
-
-system-config: 
-	@  ${MAKE} REPO_NAME=system-config prepare-repo
-
-vim.me: 
-	@  ${MAKE} REPO_NAME=vim.me prepare-repo \
-	&& ${MAKE} -C ${CACHE_DIR}/vim.me
-
-stumpwm.d: 
-	@  ${MAKE} REPO_NAME=stumpwm.d prepare-repo \
-  && ${MAKE} -C ${CACHE_DIR}/stumpwm.d
-nginx.d: 
-	@  ${MAKE} REPO_NAME=nginx.d prepare-repo
-
-sudoku: 
-	@  ${MAKE} REPO_NAME=sudoku prepare-repo
-
-mlisp: 
-	@  ${MAKE} REPO_NAME=mlisp prepare-repo
-
-lisp-koans: 
-	@  ${MAKE} REPO_NAME=lisp-koans prepare-repo
-
-awesome.d: 
-	@  ${MAKE} REPO_NAME=awesome.d prepare-repo
-
-miacropp: 
-	@  ${MAKE} REPO_NAME=miacropp prepare-repo
- 
-online-judge: 
-	@  ${MAKE} REPO_NAME=online-judge prepare-repo
+all:
+	@  ${MAKE} REPO_NAME=dotfiles  install-repo \
+	&& ${MAKE} REPO_NAME=utils install-repo \
+	&& ${MAKE} REPO_NAME=emacs.me install-repo \
+	&& ${MAKE} REPO_NAME=awesome.d install-repo \
+	&& ${MAKE} REPO_NAME=vim.me install-repo \
+	&& ${MAKE} REPO_NAME=stumpwm.d install-repo \
+	&& ${MAKE} REPO_NAME=system-config prepare-repo
+	&& ${MAKE} REPO_NAME=bootstrap prepare-repo
+	&& ${MAKE} REPO_NAME=nginx.d prepare-repo \
+	&& ${MAKE} REPO_NAME=sudoku prepare-repo \
+	&& ${MAKE} REPO_NAME=mlisp prepare-repo \
+	&& ${MAKE} REPO_NAME=lisp-koans prepare-repo \
+	&& ${MAKE} REPO_NAME=miacropp prepare-repo \
+	&& ${MAKE} REPO_NAME=online-judge prepare-repo 
 
 # component
-reinstall:
-	@  stow -d ${CACHE_DIR} -t ${INSTALL_DIR} -R ${REPO_NAME}
-
-install:
-	@  stow -d ${CACHE_DIR} -t ${INSTALL_DIR} ${REPO_NAME}
-
-uninstall:
-	@  stow -d ${CACHE_DIR} -t ${INSTALL_DIR} -D ${REPO_NAME}
-
 prepare-cache-dir:
 	@  [[ -d ${CACHE_DIR} ]] || mkdir -p ${CACHE_DIR}
 
@@ -84,6 +44,8 @@ prepare-repo:
 	&& ${MAKE} update-repo \
 	|| ${MAKE} clone-repo
 
-.PHONY: nothing prepare-cache-dir clone-repo update-repo prepare-repo 
+install-repo: prepare-repo
+	@  echo "installing repo ${REPO_NAME}" \
+	&& ${MAKE} -C ${CACHE_DIR}/${REPO_NAME} ${TARGET}
 
-.PHONY: reinstall uninstall install
+.PHONY: prepare-cache-dir prepare-repo all install
