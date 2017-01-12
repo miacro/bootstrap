@@ -20,8 +20,8 @@ all:
 	&& ${MAKE} REPO_NAME=awesome.d install-repo \
 	&& ${MAKE} REPO_NAME=vim.me install-repo \
 	&& ${MAKE} REPO_NAME=stumpwm.d install-repo \
-	&& ${MAKE} REPO_NAME=system-config prepare-repo
-	&& ${MAKE} REPO_NAME=bootstrap prepare-repo
+	&& ${MAKE} REPO_NAME=system-config prepare-repo \
+	&& ${MAKE} REPO_NAME=bootstrap prepare-repo \
 	&& ${MAKE} REPO_NAME=nginx.d prepare-repo \
 	&& ${MAKE} REPO_NAME=sudoku prepare-repo \
 	&& ${MAKE} REPO_NAME=mlisp prepare-repo \
