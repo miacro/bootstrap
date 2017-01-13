@@ -29,6 +29,13 @@ all:
 	&& ${MAKE} REPO_NAME=miacropp prepare-repo \
 	&& ${MAKE} REPO_NAME=online-judge prepare-repo 
 
+install-quicklisp:
+	@  curl https://beta.quicklisp.org/quicklisp.lisp > /tmp/quicklisp.lisp \
+	&& curl https://beta.quicklisp.org/quicklisp.lisp.asc > /tmp/quicklisp.lisp.asc \
+	&& gpg --verify /tmp/quicklisp.lisp.asc /tmp/quicklisp.lisp \
+	&& sbcl --load /tmp/quicklisp.lisp --eval "(quicklisp-quickstart:install)" --quit
+
+
 # component
 prepare-cache-dir:
 	@  [[ -d ${CACHE_DIR} ]] || mkdir -p ${CACHE_DIR}
