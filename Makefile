@@ -32,6 +32,7 @@ all:
 install-quicklisp:
 	@  curl https://beta.quicklisp.org/quicklisp.lisp > /tmp/quicklisp.lisp \
 	&& curl https://beta.quicklisp.org/quicklisp.lisp.asc > /tmp/quicklisp.lisp.asc \
+	&& gpg --recv-keys 2B2458BF \
 	&& gpg --verify /tmp/quicklisp.lisp.asc /tmp/quicklisp.lisp \
 	&& sbcl --load /tmp/quicklisp.lisp --eval "(quicklisp-quickstart:install)" --quit
 
