@@ -1,4 +1,5 @@
 CACHE_DIR=`pwd`/repository
+SHELL=/bin/bash
 
 # options
 GIT_BASE_URI="git@github.com:miacro"
