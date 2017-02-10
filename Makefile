@@ -18,9 +18,9 @@ install:
 all:
 	@  ${MAKE} REPO_NAME=dotfiles  install-repo \
 	&& ${MAKE} REPO_NAME=utils install-repo \
-	&& ${MAKE} REPO_NAME=emacs.me install-repo \
+	&& ${MAKE} REPO_NAME=emacs.d install-repo \
 	&& ${MAKE} REPO_NAME=awesome.d install-repo \
-	&& ${MAKE} REPO_NAME=vim.me install-repo \
+	&& ${MAKE} REPO_NAME=vim.d install-repo \
 	&& ${MAKE} REPO_NAME=stumpwm.d install-repo \
 	&& ${MAKE} REPO_NAME=system-config prepare-repo \
 	&& ${MAKE} REPO_NAME=bootstrap prepare-repo \
