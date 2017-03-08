@@ -26,7 +26,6 @@ all:
 	&& ${MAKE} REPO_NAME=bootstrap prepare-repo \
 	&& ${MAKE} REPO_NAME=nginx.d prepare-repo \
 	&& ${MAKE} REPO_NAME=sudoku prepare-repo \
-	&& ${MAKE} REPO_NAME=mlisp prepare-repo \
 	&& ${MAKE} REPO_NAME=lisp-koans prepare-repo \
 	&& ${MAKE} REPO_NAME=miacropp prepare-repo \
 	&& ${MAKE} REPO_NAME=online-judge prepare-repo 
