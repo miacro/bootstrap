@@ -15,6 +15,14 @@ install:
 	&& exit 0 \
 	|| ${MAKE} install-repo
 
+config:
+	@  ${MAKE} REPO_NAME=dotfiles  install-repo \
+	&& ${MAKE} REPO_NAME=utils install-repo \
+	&& ${MAKE} REPO_NAME=emacs.d install-repo \
+	&& ${MAKE} REPO_NAME=awesome.d install-repo \
+	&& ${MAKE} REPO_NAME=vim.d install-repo \
+	&& ${MAKE} REPO_NAME=stumpwm.d install-repo
+
 all:
 	@  ${MAKE} REPO_NAME=dotfiles  install-repo \
 	&& ${MAKE} REPO_NAME=utils install-repo \
