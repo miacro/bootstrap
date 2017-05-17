@@ -29,7 +29,7 @@ all:
 	&& ${MAKE} REPO_NAME=emacs.d install-repo \
 	&& ${MAKE} REPO_NAME=awesome.d install-repo \
 	&& ${MAKE} REPO_NAME=vim.d install-repo \
-	&& ${MAKE} REPO_NAME=stumpwm.d install-repo \
+	&& ${MAKE} REPO_NAME=stumpwm.d TARGET=relink install-repo \
 	&& ${MAKE} REPO_NAME=system-config prepare-repo \
 	&& ${MAKE} REPO_NAME=bootstrap prepare-repo \
 	&& ${MAKE} REPO_NAME=nginx.d prepare-repo \
