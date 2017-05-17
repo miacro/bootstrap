@@ -37,6 +37,7 @@ all:
 	&& ${MAKE} REPO_NAME=lisp-koans prepare-repo \
 	&& ${MAKE} REPO_NAME=miacropp prepare-repo \
 	&& ${MAKE} REPO_NAME=minesweeper prepare-repo \
+	&& ${MAKE} REPO_NAME=command-line-options prepare-repo \
 	&& ${MAKE} REPO_NAME=online-judge prepare-repo 
 
 install-quicklisp:
