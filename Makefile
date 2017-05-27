@@ -7,7 +7,7 @@ REPO_NAME=""
 INSTALL_DIR=${HOME}
 TARGET=reinstall
 MAKE=make --no-print-directory
-sinclude .makefile
+sinclude .Makefile
 
 install:
 	@  [[ ! -n ${REPO_NAME} ]] \
