@@ -33,7 +33,6 @@ all:
 	&& ${MAKE} REPO_NAME=system-config prepare-repo \
 	&& ${MAKE} REPO_NAME=bootstrap prepare-repo \
 	&& ${MAKE} REPO_NAME=nginx.d prepare-repo \
-	&& ${MAKE} REPO_NAME=sudoku prepare-repo \
 	&& ${MAKE} REPO_NAME=lisp-koans prepare-repo \
 	&& ${MAKE} REPO_NAME=miacropp prepare-repo \
 	&& ${MAKE} REPO_NAME=minesweeper prepare-repo \
