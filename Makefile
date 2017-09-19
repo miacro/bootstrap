@@ -38,7 +38,8 @@ all:
 	&& ${MAKE} REPO_NAME=minesweeper prepare-repo \
 	&& ${MAKE} REPO_NAME=command-line-options prepare-repo \
 	&& ${MAKE} REPO_NAME=online-judge prepare-repo \
-	&& ${MAKE} REPO_NAME=pkget prepare-repo 
+	&& ${MAKE} REPO_NAME=pkget prepare-repo \
+	&& ${MAKE} REPO_NAME=certificateauthority prepare-repo 
 
 install-quicklisp:
 	@  curl https://beta.quicklisp.org/quicklisp.lisp > /tmp/quicklisp.lisp \
