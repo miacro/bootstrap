@@ -16,7 +16,7 @@ install:
 	|| ${MAKE} install-repo
 
 config:
-	@  ${MAKE} REPO_NAME=dotfiles  install-repo \
+	@  ${MAKE} REPO_NAME=profiles TARGET=install-dotfiles install-repo \
 	&& ${MAKE} REPO_NAME=utils install-repo \
 	&& ${MAKE} REPO_NAME=emacs.d install-repo \
 	&& ${MAKE} REPO_NAME=awesome.d install-repo \
@@ -24,13 +24,7 @@ config:
 	&& ${MAKE} REPO_NAME=stumpwm.d TARGET=relink install-repo
 
 all:
-	@  ${MAKE} REPO_NAME=dotfiles  install-repo \
-	&& ${MAKE} REPO_NAME=utils install-repo \
-	&& ${MAKE} REPO_NAME=emacs.d install-repo \
-	&& ${MAKE} REPO_NAME=awesome.d install-repo \
-	&& ${MAKE} REPO_NAME=vim.d install-repo \
-	&& ${MAKE} REPO_NAME=stumpwm.d TARGET=relink install-repo \
-	&& ${MAKE} REPO_NAME=profiles prepare-repo \
+	@  ${MAKE} config \
 	&& ${MAKE} REPO_NAME=bootstrap prepare-repo \
 	&& ${MAKE} REPO_NAME=nginx.d prepare-repo \
 	&& ${MAKE} REPO_NAME=lisp-koans prepare-repo \
