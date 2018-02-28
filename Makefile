@@ -33,7 +33,7 @@ all:
 	&& ${MAKE} REPO_NAME=command-line-options prepare-repo \
 	&& ${MAKE} REPO_NAME=online-judge prepare-repo \
 	&& ${MAKE} REPO_NAME=pkget prepare-repo \
-	&& ${MAKE} REPO_NAME=certificateauthority prepare-repo \
+	&& ${MAKE} REPO_NAME=easy-cert prepare-repo \
 	&& ${MAKE} REPO_NAME=miacro-overlay prepare-repo
 
 install-quicklisp:
