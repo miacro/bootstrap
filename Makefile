@@ -34,6 +34,7 @@ all:
 	&& ${MAKE} REPO_NAME=online-judge prepare-repo \
 	&& ${MAKE} REPO_NAME=pkget prepare-repo \
 	&& ${MAKE} REPO_NAME=easycert prepare-repo \
+	&& ${MAKE} REPO_NAME=pyconfigmanager prepare-repo \
 	&& ${MAKE} REPO_NAME=miacro-overlay prepare-repo
 
 install-quicklisp:
