@@ -2,7 +2,7 @@ CACHE_DIR=`pwd`/repository
 SHELL=/bin/bash
 
 # options
-GIT_BASE_URI="git@github.com:miacro"
+GIT_BASE_URI=$$(dirname $$(git remote get-url origin))
 REPO_NAME=""
 INSTALL_DIR=${HOME}
 TARGET=reinstall
