@@ -33,6 +33,7 @@ all:
 	&& ${MAKE} REPO_NAME=command-line-options prepare-repo \
 	&& ${MAKE} REPO_NAME=online-judge prepare-repo \
 	&& ${MAKE} REPO_NAME=pkget prepare-repo \
+	&& ${MAKE} REPO_NAME=mlmisc prepare-repo \
 	&& ${MAKE} REPO_NAME=easycert prepare-repo \
 	&& ${MAKE} REPO_NAME=pyconfigmanager prepare-repo \
 	&& ${MAKE} REPO_NAME=dockerwrapper prepare-repo \
