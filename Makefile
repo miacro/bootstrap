@@ -9,6 +9,7 @@ TARGET=reinstall
 MAKE=make --no-print-directory
 sinclude .Makefile
 
+# vcsh yadm
 install-dotfiles: install-powerline
 	@  ${MAKE} REPO_NAME=dotfiles prepare-repo \
   && vcsh clone ${GIT_BASE_URI}/dotfiles
