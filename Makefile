@@ -17,6 +17,7 @@ install:
 
 config:
 	@  ${MAKE} REPO_NAME=profiles TARGET=install-dotfiles install-repo \
+	@  ${MAKE} REPO_NAME=dotfiles install-repo \
 	&& ${MAKE} REPO_NAME=utils install-repo \
 	&& ${MAKE} REPO_NAME=emacs.d install-repo \
 	&& ${MAKE} REPO_NAME=vim.d install-repo \
