@@ -9,6 +9,10 @@ TARGET=reinstall
 MAKE=make --no-print-directory
 sinclude .Makefile
 
+install-dotfiles: install-powerline
+	@  ${MAKE} REPO_NAME=dotfiles prepare-repo \
+  && vcsh clone ${GIT_BASE_URI}/dotfiles
+
 install:
 	@  [[ ! -n ${REPO_NAME} ]] \
 	&& echo "unspecified REPO_NAME" \
@@ -16,8 +20,7 @@ install:
 	|| ${MAKE} install-repo
 
 config:
-	@  ${MAKE} REPO_NAME=profiles TARGET=install-dotfiles install-repo \
-	@  ${MAKE} REPO_NAME=dotfiles install-repo \
+	@  ${MAKE} REPO_NAME=profiles install-repo \
 	&& ${MAKE} REPO_NAME=utils install-repo \
 	&& ${MAKE} REPO_NAME=emacs.d install-repo \
 	&& ${MAKE} REPO_NAME=vim.d install-repo \
@@ -48,6 +51,9 @@ install-quicklisp:
 	&& gpg --verify /tmp/quicklisp.lisp.asc /tmp/quicklisp.lisp \
 	&& sbcl --load /tmp/quicklisp.lisp --eval "(quicklisp-quickstart:install)" --quit
 
+install-powerline:
+# @pip install --upgrade --user git+git://github.com/powerline/powerline
+	@pip install --upgrade --user powerline-status
 
 # component
 prepare-cache-dir:
