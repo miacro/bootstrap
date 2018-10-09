@@ -1,4 +1,4 @@
-CACHE_DIR=`pwd`/repository
+CACHE_DIR=$(realpath .)/repository
 SHELL=/bin/bash
 
 # options
