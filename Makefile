@@ -24,7 +24,7 @@ config:
 	@  ${MAKE} REPO_NAME=utils install-repo \
 	&& ${MAKE} REPO_NAME=emacs.d install-repo \
 	&& ${MAKE} REPO_NAME=vim.d install-repo \
-	&& ${MAKE} REPO_NAME=stumpwm.d TARGET=relink install-repo
+	&& ${MAKE} REPO_NAME=stumpwm.d TARGET=link install-repo
 
 all:
 	@  ${MAKE} config \
