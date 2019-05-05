@@ -44,7 +44,7 @@ all:
 	&& ${MAKE} REPO_NAME=easycert prepare-repo \
 	&& ${MAKE} REPO_NAME=pyconfigmanager prepare-repo \
 	&& ${MAKE} REPO_NAME=dockerwrapper prepare-repo \
-	&& ${MAKE} REPO_NAME=miacro.github.com prepare-repo \
+	&& ${MAKE} REPO_NAME=miacro.github.io prepare-repo \
 	&& ${MAKE} REPO_NAME=miacro-overlay prepare-repo
 
 install-quicklisp:
