@@ -1,5 +1,6 @@
 CACHE_DIR=$(realpath .)/repository
 SHELL=/bin/bash
+PIP=pip3
 
 # options
 GIT_BASE_URI=$$(dirname $$(git remote get-url origin))
@@ -55,8 +56,8 @@ install-quicklisp:
 	&& sbcl --load /tmp/quicklisp.lisp --eval "(quicklisp-quickstart:install)" --quit
 
 install-powerline:
-# @pip install --upgrade --user git+git://github.com/powerline/powerline
-	@pip install --upgrade --user powerline-status
+# @{PIP} install --upgrade --user git+git://github.com/powerline/powerline
+	@{PIP} install --upgrade --user powerline-status
 
 # component
 prepare-cache-dir:

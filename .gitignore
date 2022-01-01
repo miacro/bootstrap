@@ -110,3 +110,5 @@ install_manifest.txt
 
 /repository
 /.Makefile
+.DS_Store
+._DS_Store
