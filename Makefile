@@ -53,8 +53,8 @@ install-quicklisp:
 	&& sbcl --load /tmp/quicklisp.lisp --eval "(quicklisp-quickstart:install)" --quit
 
 install-powerline:
-# @{PIP} install --upgrade --user git+git://github.com/powerline/powerline
-	@{PIP} install --upgrade --user powerline-status
+# @${PIP} install --upgrade --user git+git://github.com/powerline/powerline
+	@${PIP} install --upgrade --user powerline-status
 
 # component
 prepare-cache-dir:
