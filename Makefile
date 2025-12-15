@@ -56,6 +56,19 @@ install-powerline:
 # @${PIP} install --upgrade --user git+git://github.com/powerline/powerline
 	@${PIP} install --upgrade --user powerline-status
 
+install-rime-ice: rime_url=https://github.com/iDvel/rime-ice.git
+install-rime-ice: rime_dir=~/.local/share/fcitx5/rime
+install-rime-ice: rime_cfg=~/.local/share/fcitx5/rime/default.custom.yaml
+install-rime-ice:
+	if [ ! -d ${rime_dir}/.git ]; then \
+    mkdir -p ${rime_dir}; \
+    git clone --depth 1 ${rime_url} ${rime_dir}; \
+  fi
+	if [ ! -f "${rime_cfg}" ]; then \
+    echo "patch:" > ${rime_cfg}; \
+    echo '    "menu/page_size": 9' >> ${rime_cfg}; \
+  fi
+
 # component
 prepare-cache-dir:
 	@  [[ -d ${CACHE_DIR} ]] || mkdir -p ${CACHE_DIR}
