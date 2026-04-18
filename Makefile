@@ -36,12 +36,7 @@ all:
 	&& ${MAKE} REPO_NAME=miacropp prepare-repo \
 	&& ${MAKE} REPO_NAME=datasets prepare-repo \
 	&& ${MAKE} REPO_NAME=minesweeper prepare-repo \
-	&& ${MAKE} REPO_NAME=recommended-system prepare-repo \
 	&& ${MAKE} REPO_NAME=online-judge prepare-repo \
-	&& ${MAKE} REPO_NAME=mlmisc prepare-repo \
-	&& ${MAKE} REPO_NAME=repomisc prepare-repo \
-	&& ${MAKE} REPO_NAME=easycert prepare-repo \
-	&& ${MAKE} REPO_NAME=pyconfigmanager prepare-repo \
 	&& ${MAKE} REPO_NAME=miacro.github.io prepare-repo \
 	&& ${MAKE} REPO_NAME=miacro-overlay prepare-repo
 
