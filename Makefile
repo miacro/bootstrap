@@ -37,6 +37,7 @@ all:
 	&& ${MAKE} REPO_NAME=datasets prepare-repo \
 	&& ${MAKE} REPO_NAME=minesweeper prepare-repo \
 	&& ${MAKE} REPO_NAME=online-judge prepare-repo \
+	&& ${MAKE} REPO_NAME=container-recipes prepare-repo \
 	&& ${MAKE} REPO_NAME=miacro.github.io prepare-repo \
 	&& ${MAKE} REPO_NAME=miacro-overlay prepare-repo
 
