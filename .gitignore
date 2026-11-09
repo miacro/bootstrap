@@ -112,3 +112,4 @@ install_manifest.txt
 /.Makefile
 .DS_Store
 ._DS_Store
+/repos

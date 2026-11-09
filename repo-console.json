@@ -1,0 +1,56 @@
+{
+  "defaults": {
+    "base_dir": "./repos",
+    "base_url": "https://github.com/miacro"
+  },
+  "repos": [
+    {
+      "repo": "utils"
+    },
+    {
+      "repo": "emacs.d"
+    },
+    {
+      "repo": "vim.d"
+    },
+    {
+      "repo": "stumpwm.d"
+    },
+    {
+      "repo": "bootstrap"
+    },
+    {
+      "repo": "profiles"
+    },
+    {
+      "repo": "nginx.d"
+    },
+    {
+      "repo": "lisp-koans"
+    },
+    {
+      "repo": "miacropp"
+    },
+    {
+      "repo": "datasets"
+    },
+    {
+      "repo": "minesweeper"
+    },
+    {
+      "repo": "online-judge"
+    },
+    {
+      "repo": "container-recipes"
+    },
+    {
+      "repo": "miacro.github.io"
+    },
+    {
+      "repo": "miacro-overlay"
+    },
+    {
+      "repo": "dotfiles"
+    }
+  ]
+}
