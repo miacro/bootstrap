@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from urllib.parse import SplitResult, unquote, urlsplit
+from urllib.parse import SplitResult, unquote, unquote_to_bytes, urlsplit
 from typing import Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
 
 DEFAULT_REPO_FILENAME = "repo-console.json"
@@ -218,6 +218,13 @@ class RepoSpec:
     @staticmethod
     def parse_repo(repo: str) -> Tuple[str, SplitResult]:
         """Classify once, preserving the original address and undecoded path."""
+        if repo.startswith("file://"):
+            address = repo[len("file://") :]
+            host, separator, path = address.partition("/")
+            if separator:
+                path = "/" + path
+            # Git treats ? and # as path characters for its file transport.
+            return "url", SplitResult("file", host, path, "", "")
         if "://" in repo:
             return "url", urlsplit(repo)
         scp_match = re.match(r"^([^/]+?):(.*)$", repo, re.DOTALL)
@@ -228,6 +235,13 @@ class RepoSpec:
             host, path = scp_match.groups()
             return "scp", SplitResult("", host, path, "", "")
         return "path", SplitResult("", "", repo, "", "")
+
+    @staticmethod
+    def decode_file_url_path(path: str) -> str:
+        """Decode percent escapes once, retaining filesystem bytes losslessly."""
+        raw_path = os.fsencode(path)
+        decoded_path = unquote_to_bytes(raw_path)
+        return os.fsdecode(decoded_path)
 
     @classmethod
     def is_url(cls, repo: str) -> bool:
@@ -242,7 +256,25 @@ class RepoSpec:
     def absolute_path(cls, value: str, base: str) -> str:
         expanded = cls.expand_path(value)
         path = os.path.join(str(base), expanded)
-        return os.path.abspath(path)
+        if not os.path.isabs(path):
+            path = os.path.join(os.getcwd(), path)
+        # Keep .. for the filesystem to resolve after traversing symbolic links.
+        components = path
+        if os.path.altsep is not None:
+            components = components.replace(os.path.altsep, os.path.sep)
+        if os.path.pardir in components.split(os.path.sep):
+            return path
+        return os.path.normpath(path)
+
+    @classmethod
+    def normalize_dest(cls, value: str, base: str) -> str:
+        """Expose the final path entry without collapsing intermediate parents."""
+        dest = cls.absolute_path(value, base)
+        while True:
+            parent, name = os.path.split(dest)
+            if name not in ("", os.path.curdir) or parent == dest:
+                return dest
+            dest = parent
 
     @classmethod
     def canonical_path(cls, value: str, base: str) -> str:
@@ -296,7 +328,9 @@ class RepoSpec:
         kind, parsed_repo = cls.parse_repo(repo)
         path = parsed_repo.path.rstrip("/")
         name = path.rsplit("/", 1)[-1]
-        if kind == "url":
+        if kind == "url" and parsed_repo.scheme == "file":
+            name = cls.decode_file_url_path(name)
+        elif kind == "url":
             name = unquote(name)
         if name.endswith(".git"):
             name = name[:-4]
@@ -358,7 +392,7 @@ class RepoSpec:
             and parsed_repo.scheme == "file"
             and parsed_repo.netloc in ("", "localhost")
         ):
-            local_path = unquote(parsed_repo.path)
+            local_path = cls.decode_file_url_path(parsed_repo.path)
             return "local", cls.canonical_path(local_path, os.getcwd())
         if kind != "path":
             address = repo.rstrip("/")
@@ -470,14 +504,37 @@ class CommandRunner:
             cwd=cwd,
             env=env,
             capture_output=True,
-            text=True,
         )
         if result.returncode:
             return None
-        value = result.stdout
+        # Text mode would translate CR and CRLF inside paths and config values.
+        value = os.fsdecode(result.stdout)
         if value.endswith("\n"):
             value = value[:-1]
         return value
+
+    @classmethod
+    def read_git_config_values(
+        cls,
+        key: str,
+        *,
+        cwd: Optional[str] = None,
+        env: Optional[Mapping[str, str]] = None
+    ) -> List[str]:
+        """Read raw config values in order, preserving whitespace within each."""
+        result = cls.run_git(
+            "config",
+            "--null",
+            "--get-all",
+            key,
+            cwd=cwd,
+            env=env,
+            capture_output=True,
+        )
+        if result.returncode:
+            return []
+        values = result.stdout.split(b"\0")[:-1]
+        return [os.fsdecode(value) for value in values]
 
 
 class RepoFile(RepoSpec):
@@ -624,11 +681,12 @@ class RepoFile(RepoSpec):
         repo = self.resolve_repo(repo, self.input_dir, base_url=base_url)
         if dest is None:
             dest = self.default_dest(repo, base_dir)
-        dest = self.absolute_path(dest, base_dir)
+        dest = self.normalize_dest(dest, base_dir)
+        command_dest = self.canonical_path(dest, self.input_dir)
         resolved_commands = []
         for command in commands:
             cwd = command.cwd
-            cwd = self.command_cwd(cwd, self.input_dir, dest)
+            cwd = self.command_cwd(cwd, self.input_dir, command_dest)
             resolved_commands.append(RepoCommand(command.cmd, cwd))
         return RepoSpec(
             repo,
@@ -835,13 +893,14 @@ class RepoInstaller:
         dest_path = RepoSpec.canonical_path(dest, cwd)
         if root_path != dest_path:
             return False
-        origin_url = self.runner.read_git_value(
-            "-C",
-            str(dest),
-            "config",
-            "--get",
-            "remote.origin.url",
-        )
+        origin_urls = self.runner.read_git_config_values("remote.origin.url", cwd=dest)
+        origin_url = None
+        for value in origin_urls:
+            # Git uses the first URL after the last empty-value reset.
+            if value == "":
+                origin_url = None
+            elif origin_url is None:
+                origin_url = value
         if origin_url is None:
             return False
         origin_identity = RepoSpec.identity(origin_url, dest)
@@ -885,7 +944,7 @@ class RepoInstaller:
     @staticmethod
     def check_replace_dest(dest: str) -> None:
         cwd = os.getcwd()
-        dest = RepoSpec.absolute_path(dest, cwd)
+        dest = RepoSpec.normalize_dest(dest, cwd)
         if os.path.islink(dest):
             raise RuntimeError("refusing to replace a symbolic link: {}".format(dest))
         resolved = RepoSpec.canonical_path(dest, cwd)
@@ -950,7 +1009,9 @@ class RepoInstaller:
     ) -> None:
         # Keep the old dest until cloning succeeds. Sibling staging keeps
         # renames on the same filesystem, and permits rollback if publication fails.
-        dest = RepoSpec.absolute_path(dest, os.getcwd())
+        self.check_replace_dest(dest)
+        # Freeze the path before moving a dest that may contain its own aliases.
+        dest = RepoSpec.canonical_path(dest, os.getcwd())
         parent = os.path.dirname(dest)
         staging = tempfile.mkdtemp(prefix=".repo-console-", dir=parent)
         replacement = os.path.join(staging, "new")
@@ -996,7 +1057,7 @@ class RepoInstaller:
         dry_run: bool = False,
         commands: Optional[Sequence[RepoCommand]] = None
     ) -> None:
-        dest = RepoSpec.absolute_path(dest, os.getcwd())
+        dest = RepoSpec.normalize_dest(dest, os.getcwd())
         exists = os.path.lexists(dest)
         if exists and self.matches_dest(dest, repo):
             print("Already installed; skipping: {}".format(dest))
@@ -1082,12 +1143,13 @@ def main() -> int:
     )
     parser.set_defaults(func=None)
     commands = parser.add_subparsers(dest="command")
-    repo_options = argparse.ArgumentParser(add_help=False)
-    repo_options.add_argument(
+    repo_inputs = argparse.ArgumentParser(add_help=False)
+    repo_inputs.add_argument(
         "repos",
         nargs="*",
         help="URL/name[=>path], local repo[=>path] or JSON config file; defaults to ./repo-console.json",
     )
+    repo_options = argparse.ArgumentParser(add_help=False, parents=[repo_inputs])
     repo_options.add_argument(
         "-bd",
         "--base-dir",
@@ -1130,7 +1192,14 @@ def main() -> int:
         help="clone repos and run configured commands",
     )
     install.set_defaults(func=cmd_install, run_commands=True)
-    args = parser.parse_args()
+    args, extra_inputs = parser.parse_known_args()
+    if extra_inputs:
+        # Python 3.5 argparse leaves repos after interspersed options unparsed.
+        # Parse those as positionals, preserving -- and rejecting unknown options.
+        remaining, unknown = repo_inputs.parse_known_args(extra_inputs)
+        if unknown:
+            parser.error("unrecognized arguments: {}".format(" ".join(unknown)))
+        args.repos.extend(remaining.repos)
     if args.func is None:
         parser.print_help()
         return 0
