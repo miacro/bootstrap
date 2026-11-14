@@ -11,7 +11,16 @@ import subprocess
 import sys
 import tempfile
 from urllib.parse import SplitResult, unquote, unquote_to_bytes, urlsplit
-from typing import Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import (
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 DEFAULT_REPO_FILENAME = "repo-console.json"
 
@@ -278,8 +287,7 @@ class RepoSpec:
 
     @classmethod
     def canonical_path(cls, value: str, base: str) -> str:
-        expanded = cls.expand_path(value)
-        path = os.path.join(str(base), expanded)
+        path = cls.absolute_path(value, base)
         return os.path.realpath(path)
 
     @staticmethod
@@ -406,6 +414,14 @@ class GitNotFoundError(RuntimeError):
     pass
 
 
+class RepoReplaceError(RuntimeError):
+    """A failed replacement whose original error determines the exit status."""
+
+    def __init__(self, message: str, *, original_error: Exception) -> None:
+        self.original_error = original_error
+        super().__init__(message)
+
+
 class RepoBatchInstallError(RuntimeError):
     def __init__(self, failures: Sequence[Tuple[RepoSpec, Exception]]) -> None:
         self.failures = list(failures)
@@ -414,7 +430,9 @@ class RepoBatchInstallError(RuntimeError):
             for spec, error in self.failures
         ]
         summary = "\n".join(details)
-        msg = "{} repos failed:\n{}".format(len(details), summary)
+        count = len(details)
+        label = "error" if count == 1 else "errors"
+        msg = "{} installation {}:\n{}".format(count, label, summary)
         super().__init__(msg)
 
 
@@ -462,9 +480,8 @@ class CommandRunner:
             universal_newlines=text,
         )
 
-    @classmethod
     def run_git(
-        cls,
+        self,
         *arguments: str,
         cwd: Optional[str] = None,
         env: Optional[Mapping[str, str]] = None,
@@ -473,7 +490,7 @@ class CommandRunner:
         text: bool = False
     ) -> subprocess.CompletedProcess:
         try:
-            return cls.run_command(
+            return self.run_command(
                 ["git", *arguments],
                 cwd=cwd,
                 env=env,
@@ -491,15 +508,14 @@ class CommandRunner:
             msg = "git executable not found; install Git and check PATH"
             raise GitNotFoundError(msg) from exc
 
-    @classmethod
     def read_git_value(
-        cls,
+        self,
         *arguments: str,
         cwd: Optional[str] = None,
         env: Optional[Mapping[str, str]] = None
     ) -> Optional[str]:
         """Read a Git value, removing only its appended terminating newline."""
-        result = cls.run_git(
+        result = self.run_git(
             *arguments,
             cwd=cwd,
             env=env,
@@ -513,16 +529,15 @@ class CommandRunner:
             value = value[:-1]
         return value
 
-    @classmethod
     def read_git_config_values(
-        cls,
+        self,
         key: str,
         *,
         cwd: Optional[str] = None,
         env: Optional[Mapping[str, str]] = None
     ) -> List[str]:
         """Read raw config values in order, preserving whitespace within each."""
-        result = cls.run_git(
+        result = self.run_git(
             "config",
             "--null",
             "--get-all",
@@ -598,8 +613,13 @@ class RepoFile(RepoSpec):
             with open(filename, encoding="utf-8") as stream:
                 config = json.load(stream)
         except (OSError, ValueError) as exc:
+            reason = str(exc)
+            if isinstance(exc, OSError) and exc.strerror is not None:
+                reason = exc.strerror
+                if exc.errno is not None:
+                    reason = "[Errno {}] {}".format(exc.errno, reason)
             msg = "cannot read JSON config: {}"
-            raise RepoConfigError(msg.format(exc), context=filename) from exc
+            raise RepoConfigError(msg.format(reason), context=filename) from exc
         if not isinstance(config, dict):
             raise RepoConfigError("config must be an object", context=filename)
         if not isinstance(config.get("repos", []), list):
@@ -682,7 +702,9 @@ class RepoFile(RepoSpec):
         if dest is None:
             dest = self.default_dest(repo, base_dir)
         dest = self.normalize_dest(dest, base_dir)
-        command_dest = self.canonical_path(dest, self.input_dir)
+        command_dest = dest
+        if any(command.cwd.startswith("$dest") for command in commands):
+            command_dest = self.canonical_path(dest, self.input_dir)
         resolved_commands = []
         for command in commands:
             cwd = command.cwd
@@ -754,18 +776,13 @@ class RepoFile(RepoSpec):
         active_files: Sequence[str] = (),
         context: Optional[str] = None
     ) -> None:
-        """Load, check and append one entry, attaching its location on failure."""
+        """Load and append one entry, attaching its location on failure."""
         if context is None:
             context = self.repo_file
             if context is None:
                 context = "command line"
         try:
             entry = self.load_entry(options, active_files=active_files, context=context)
-            if isinstance(entry, RepoFile):
-                new_specs = entry.iter_specs()
-            else:
-                new_specs = [entry]
-            self.check_dest_conflicts(new_specs)
         except RepoConfigError:
             raise
         except ValueError as exc:
@@ -783,21 +800,6 @@ class RepoFile(RepoSpec):
             raise
         except ValueError as exc:
             raise RepoConfigError(str(exc), context=context) from exc
-
-    def check_dest_conflicts(self, specs: Iterable[RepoSpec]) -> None:
-        """Reject conflicts within new specs or with any previously loaded spec."""
-        dests = []
-        for previous_spec in self.iter_specs():
-            dests.append(self.canonical_path(previous_spec.dest, self.cwd))
-        for new_spec in specs:
-            resolved = self.canonical_path(new_spec.dest, self.cwd)
-            for previous in dests:
-                inside_previous = self.is_within(resolved, previous)
-                contains_previous = self.is_within(previous, resolved)
-                if inside_previous or contains_previous:
-                    msg = "conflicting dests: {} and {}"
-                    raise ValueError(msg.format(previous, resolved))
-            dests.append(resolved)
 
     def load_from_cmd(self, inputs: Sequence[str]) -> "RepoFile":
         """Set up the CLI root and process its inputs one at a time."""
@@ -876,6 +878,18 @@ class RepoInstaller:
         if failures:
             raise RepoBatchInstallError(failures)
 
+    def read_origin_url(self, dest: str) -> Optional[str]:
+        """Select Git's effective origin URL without applying address rewriting."""
+        origin_urls = self.runner.read_git_config_values("remote.origin.url", cwd=dest)
+        origin_url = None
+        for value in origin_urls:
+            # Git uses the first URL after the last empty-value reset.
+            if value == "":
+                origin_url = None
+            elif origin_url is None:
+                origin_url = value
+        return origin_url
+
     def matches_dest(self, dest: str, repo: str) -> bool:
         if not os.path.isdir(dest):
             return False
@@ -893,18 +907,15 @@ class RepoInstaller:
         dest_path = RepoSpec.canonical_path(dest, cwd)
         if root_path != dest_path:
             return False
-        origin_urls = self.runner.read_git_config_values("remote.origin.url", cwd=dest)
-        origin_url = None
-        for value in origin_urls:
-            # Git uses the first URL after the last empty-value reset.
-            if value == "":
-                origin_url = None
-            elif origin_url is None:
-                origin_url = value
+        origin_url = self.read_origin_url(dest)
         if origin_url is None:
             return False
-        origin_identity = RepoSpec.identity(origin_url, dest)
         requested_identity = RepoSpec.identity(repo, cwd)
+        try:
+            origin_identity = RepoSpec.identity(origin_url, dest)
+        except ValueError:
+            # A damaged existing origin is a mismatch, not an invalid request.
+            return False
         return origin_identity == requested_identity
 
     @staticmethod
@@ -946,37 +957,29 @@ class RepoInstaller:
         cwd = os.getcwd()
         dest = RepoSpec.normalize_dest(dest, cwd)
         if os.path.islink(dest):
-            raise RuntimeError("refusing to replace a symbolic link: {}".format(dest))
+            raise RuntimeError("refusing to replace a symbolic link")
         resolved = RepoSpec.canonical_path(dest, cwd)
         home = RepoSpec.canonical_path("~", cwd)
         working_dir = RepoSpec.canonical_path(cwd, cwd)
         script_path = RepoSpec.canonical_path(__file__, cwd)
         script_dir = os.path.dirname(script_path)
-        msg = "refusing to replace a protected directory: {}"
+        msg = "refusing to replace a protected directory"
         if resolved == home:
-            raise RuntimeError(msg.format(dest))
+            raise RuntimeError(msg)
         for path in (working_dir, script_dir):
             if RepoSpec.is_within(path, resolved):
-                raise RuntimeError(msg.format(dest))
+                raise RuntimeError(msg)
 
     @staticmethod
-    def publish_replacement(replacement: str, dest: str, backup: str) -> None:
-        """Publish the clone, restoring the previous dest if publication fails."""
-        os.rename(dest, backup)
-        try:
-            os.rename(replacement, dest)
-        except BaseException as exc:
-            try:
-                os.rename(backup, dest)
-            except OSError as recovery_error:
-                if not isinstance(exc, Exception):
-                    raise exc from recovery_error
-                msg = (
-                    "replacement failed: {}; restoration failed: {}; "
-                    "original dest retained at {}"
-                ).format(exc, recovery_error, backup)
-                raise RuntimeError(msg) from recovery_error
-            raise
+    def restore_backup(dest: str, backup: str) -> None:
+        """Remove an incomplete clone and restore the previous dest."""
+        if os.path.islink(dest):
+            os.unlink(dest)
+        elif os.path.isdir(dest):
+            shutil.rmtree(dest)
+        elif os.path.lexists(dest):
+            os.unlink(dest)
+        os.rename(backup, dest)
 
     @staticmethod
     def cleanup_staging(
@@ -988,15 +991,20 @@ class RepoInstaller:
     ) -> None:
         """Retain unrestored backups and avoid masking an active exception."""
         if os.path.exists(backup) and not installed:
-            print("error: original dest retained at {}".format(backup), file=sys.stderr)
+            # The recovery handler reports why this backup must be retained.
             return
         try:
             shutil.rmtree(staging)
+        except KeyboardInterrupt:
+            msg = "error: cleanup interrupted; temporary directory may remain at {}"
+            print(msg.format(staging), file=sys.stderr)
+            raise
         except OSError as cleanup_error:
-            msg = "error: could not remove temporary directory {}: {}"
-            print(msg.format(staging, cleanup_error), file=sys.stderr)
+            msg = "could not remove temporary directory {}: {}"
+            message = msg.format(staging, cleanup_error)
             if pending_error is None:
-                raise
+                raise RuntimeError(message) from cleanup_error
+            print("error: {}".format(message), file=sys.stderr)
 
     def replace(
         self,
@@ -1007,21 +1015,40 @@ class RepoInstaller:
         depth: Optional[int] = None,
         commands: Optional[Sequence[RepoCommand]] = None
     ) -> None:
-        # Keep the old dest until cloning succeeds. Sibling staging keeps
-        # renames on the same filesystem, and permits rollback if publication fails.
+        # Keep the old dest in a sibling backup while cloning into the final dest.
         self.check_replace_dest(dest)
         # Freeze the path before moving a dest that may contain its own aliases.
         dest = RepoSpec.canonical_path(dest, os.getcwd())
         parent = os.path.dirname(dest)
         staging = tempfile.mkdtemp(prefix=".repo-console-", dir=parent)
-        replacement = os.path.join(staging, "new")
         backup = os.path.join(staging, "previous")
         installed = False
         try:
-            self.clone(repo, replacement, branch=branch, depth=depth)
-            self.publish_replacement(replacement, dest, backup)
+            os.rename(dest, backup)
+            self.clone(repo, dest, branch=branch, depth=depth)
+        except BaseException as exc:
+            if os.path.lexists(backup):
+                try:
+                    self.restore_backup(dest, backup)
+                except BaseException as recovery_error:
+                    reason = str(recovery_error) or type(recovery_error).__name__
+                    msg = "restoration failed: {}; original dest retained at {}"
+                    detail = msg.format(reason, backup)
+                    interrupted = not isinstance(exc, Exception) or not isinstance(
+                        recovery_error, Exception
+                    )
+                    if interrupted:
+                        print("error: {}".format(detail), file=sys.stderr)
+                        if not isinstance(recovery_error, Exception):
+                            raise
+                        raise exc from recovery_error
+                    msg = "replacement failed: {}; {}"
+                    message = msg.format(exc, detail)
+                    error = RepoReplaceError(message, original_error=exc)
+                    raise error from recovery_error
+            raise
+        else:
             installed = True
-            print("Replaced: {}".format(dest), flush=True)
         finally:
             pending_error = sys.exc_info()[1]
             self.cleanup_staging(
@@ -1030,6 +1057,7 @@ class RepoInstaller:
                 installed=installed,
                 pending_error=pending_error,
             )
+        print("Replaced: {}".format(dest), flush=True)
         # Initialization failures must not enter the replacement rollback/cleanup.
         if commands is not None:
             self.execute_commands(commands)
@@ -1062,17 +1090,13 @@ class RepoInstaller:
         if exists and self.matches_dest(dest, repo):
             print("Already installed; skipping: {}".format(dest))
             return
-        if exists:
-            if not force:
-                msg = (
-                    "dest is not the requested repo: {}; "
-                    "use --force to replace its contents"
-                )
-                raise RuntimeError(msg.format(dest))
-            self.check_replace_dest(dest)
+        if exists and not force:
+            msg = "dest is not the requested repo; use --force to replace its contents"
+            raise RuntimeError(msg)
         if dry_run:
             if exists:
-                msg = "Would clone into a temporary directory, then replace: {}"
+                self.check_replace_dest(dest)
+                msg = "Would back up dest, clone into it, then remove the backup: {}"
                 print(msg.format(dest))
             git_command = self.clone_command(repo, dest, branch=branch, depth=depth)
             display_command = self.runner.format_command(git_command)
@@ -1135,6 +1159,20 @@ def cmd_install(args: argparse.Namespace) -> None:
         dry_run=args.dry_run,
         run_commands=args.run_commands,
     )
+
+
+def install_error_exit_code(error: Exception) -> int:
+    """Map an installation failure to its CLI exit status."""
+    while isinstance(error, RepoReplaceError):
+        error = error.original_error
+    if isinstance(error, GitNotFoundError):
+        return 127
+    if isinstance(error, subprocess.CalledProcessError):
+        code = error.returncode
+        if code < 0:
+            return 128 - code
+        return code
+    return 1
 
 
 def main() -> int:
@@ -1208,23 +1246,12 @@ def main() -> int:
         return 0
     except RepoBatchInstallError as exc:
         print("error: {}".format(exc), file=sys.stderr)
-        first_error = exc.failures[0][1]
-        if isinstance(first_error, GitNotFoundError):
-            return 127
-        if isinstance(first_error, subprocess.CalledProcessError):
-            code = first_error.returncode
-            if code < 0:
-                return 128 - code
-            return code
-        return 1
-    except GitNotFoundError as exc:
-        print("error: {}".format(exc), file=sys.stderr)
-        return 127
+        return install_error_exit_code(exc.failures[0][1])
     except ValueError as exc:
         parser.error(str(exc))
-    except (OSError, RuntimeError) as exc:
+    except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
         print("error: {}".format(exc), file=sys.stderr)
-        return 1
+        return install_error_exit_code(exc)
     except KeyboardInterrupt:
         print("\nerror: interrupted", file=sys.stderr)
         return 130

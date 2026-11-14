@@ -5,19 +5,24 @@
   },
   "repos": [
     {
-      "repo": "utils"
+      "repo": "utils",
+      "dest": "~/bin/utils"
     },
     {
-      "repo": "emacs.d"
+      "repo": "emacs.d",
+      "dest": "~/.emacs.d"
     },
     {
-      "repo": "vim.d"
+      "repo": "vim.d",
+      "dest": "~/.vim"
     },
     {
-      "repo": "stumpwm.d"
+      "repo": "stumpwm.d",
+      "dest": "~/.stumpwm.d"
     },
     {
-      "repo": "bootstrap"
+      "repo": "bootstrap",
+      "dest": "~/bootstrap"
     },
     {
       "repo": "profiles"
