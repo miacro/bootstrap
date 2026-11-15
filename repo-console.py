@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install Git repos into explicit directories or ./repo-name."""
+"""Install and update Git repos from command-line inputs or JSON config files."""
 
 import argparse
 import json
@@ -422,8 +422,10 @@ class RepoReplaceError(RuntimeError):
         super().__init__(message)
 
 
-class RepoBatchInstallError(RuntimeError):
-    def __init__(self, failures: Sequence[Tuple[RepoSpec, Exception]]) -> None:
+class RepoBatchError(RuntimeError):
+    def __init__(
+        self, failures: Sequence[Tuple[RepoSpec, Exception]], *, operation: str
+    ) -> None:
         self.failures = list(failures)
         details = [
             "{} -> {}: {}".format(spec.repo, spec.dest, error)
@@ -432,8 +434,18 @@ class RepoBatchInstallError(RuntimeError):
         summary = "\n".join(details)
         count = len(details)
         label = "error" if count == 1 else "errors"
-        msg = "{} installation {}:\n{}".format(count, label, summary)
+        msg = "{} {} {}:\n{}".format(count, operation, label, summary)
         super().__init__(msg)
+
+
+class RepoBatchInstallError(RepoBatchError):
+    def __init__(self, failures: Sequence[Tuple[RepoSpec, Exception]]) -> None:
+        super().__init__(failures, operation="installation")
+
+
+class RepoBatchUpdateError(RepoBatchError):
+    def __init__(self, failures: Sequence[Tuple[RepoSpec, Exception]]) -> None:
+        super().__init__(failures, operation="update")
 
 
 class SingleValueAction(argparse.Action):
@@ -837,7 +849,7 @@ class RepoFile(RepoSpec):
 
 
 class RepoInstaller:
-    """Install resolved specs through a shared command runner."""
+    """Install and update resolved specs through a shared command runner."""
 
     def __init__(self, *, runner: Optional[CommandRunner] = None) -> None:
         if runner is None:
@@ -877,6 +889,34 @@ class RepoInstaller:
                 failures.append((spec, exc))
         if failures:
             raise RepoBatchInstallError(failures)
+
+    def update_specs(self, specs: Iterable[RepoSpec], *, dry_run: bool = False) -> None:
+        """Attempt every update, then report all failures together."""
+        failures = []
+        for spec in specs:
+            try:
+                self.update(spec.repo, spec.dest, dry_run=dry_run)
+            except (
+                OSError,
+                RuntimeError,
+                ValueError,
+                subprocess.CalledProcessError,
+            ) as exc:
+                failures.append((spec, exc))
+        if failures:
+            raise RepoBatchUpdateError(failures)
+
+    def update(self, repo: str, dest: str, *, dry_run: bool = False) -> None:
+        dest = RepoSpec.normalize_dest(dest, os.getcwd())
+        if not os.path.lexists(dest):
+            raise RuntimeError("dest does not exist; install the repo first")
+        if not self.matches_dest(dest, repo):
+            raise RuntimeError("dest is not the requested repo")
+        display_command = self.runner.format_command(["git", "pull"])
+        msg = "Command (cwd={}): {}"
+        print(msg.format(shlex.quote(dest), display_command), flush=True)
+        if not dry_run:
+            self.runner.run_git("pull", cwd=dest, check=True)
 
     def read_origin_url(self, dest: str) -> Optional[str]:
         """Select Git's effective origin URL without applying address rewriting."""
@@ -1161,8 +1201,31 @@ def cmd_install(args: argparse.Namespace) -> None:
     )
 
 
-def install_error_exit_code(error: Exception) -> int:
-    """Map an installation failure to its CLI exit status."""
+def repo_update(
+    inputs: Sequence[str],
+    *,
+    base_dir: Optional[str] = None,
+    base_url: Optional[str] = None,
+    dry_run: bool = False
+) -> None:
+    """Resolve all inputs before updating the installed repos."""
+    repo_file = RepoFile(base_dir=base_dir, base_url=base_url)
+    repo_file.load_from_cmd(inputs)
+    installer = RepoInstaller()
+    installer.update_specs(repo_file.iter_specs(), dry_run=dry_run)
+
+
+def cmd_update(args: argparse.Namespace) -> None:
+    repo_update(
+        args.repos,
+        base_dir=args.base_dir,
+        base_url=args.base_url,
+        dry_run=args.dry_run,
+    )
+
+
+def repo_error_exit_code(error: Exception) -> int:
+    """Map a repo operation failure to its CLI exit status."""
     while isinstance(error, RepoReplaceError):
         error = error.original_error
     if isinstance(error, GitNotFoundError):
@@ -1177,7 +1240,7 @@ def install_error_exit_code(error: Exception) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Clone Git repos and optionally run configured commands."
+        description="Install and update Git repos from URLs, paths or JSON config files."
     )
     parser.set_defaults(func=None)
     commands = parser.add_subparsers(dest="command")
@@ -1200,36 +1263,44 @@ def main() -> int:
         action=SingleValueAction,
         help="repo name prefix inherited by configs",
     )
-    repo_options.add_argument("-b", "--branch", help="branch or tag to check out")
-    repo_options.add_argument(
-        "-d", "--depth", type=positive_int, help="shallow clone history depth"
-    )
-    repo_options.add_argument(
-        "-f",
-        "--force",
-        action="store_true",
-        help="replace a dest that is not the requested repo",
-    )
     repo_options.add_argument(
         "-dr",
         "--dry-run",
         action="store_true",
         help="inspect and print the plan without changes",
     )
+    install_options = argparse.ArgumentParser(add_help=False, parents=[repo_options])
+    install_options.add_argument("-b", "--branch", help="branch or tag to check out")
+    install_options.add_argument(
+        "-d", "--depth", type=positive_int, help="shallow clone history depth"
+    )
+    install_options.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="replace a dest that is not the requested repo",
+    )
     prepare = commands.add_parser(
         "prepare",
         aliases=["p"],
-        parents=[repo_options],
+        parents=[install_options],
         help="clone repos without running configured commands",
     )
     prepare.set_defaults(func=cmd_install, run_commands=False)
     install = commands.add_parser(
         "install",
         aliases=["i"],
-        parents=[repo_options],
+        parents=[install_options],
         help="clone repos and run configured commands",
     )
     install.set_defaults(func=cmd_install, run_commands=True)
+    update = commands.add_parser(
+        "update",
+        aliases=["u"],
+        parents=[repo_options],
+        help="run git pull in installed repos",
+    )
+    update.set_defaults(func=cmd_update)
     args, extra_inputs = parser.parse_known_args()
     if extra_inputs:
         # Python 3.5 argparse leaves repos after interspersed options unparsed.
@@ -1244,14 +1315,14 @@ def main() -> int:
     try:
         args.func(args)
         return 0
-    except RepoBatchInstallError as exc:
+    except RepoBatchError as exc:
         print("error: {}".format(exc), file=sys.stderr)
-        return install_error_exit_code(exc.failures[0][1])
+        return repo_error_exit_code(exc.failures[0][1])
     except ValueError as exc:
         parser.error(str(exc))
     except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
         print("error: {}".format(exc), file=sys.stderr)
-        return install_error_exit_code(exc)
+        return repo_error_exit_code(exc)
     except KeyboardInterrupt:
         print("\nerror: interrupted", file=sys.stderr)
         return 130
