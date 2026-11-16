@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install and update Git repos from command-line inputs or JSON config files."""
+"""Manage Git repos and their commands from CLI inputs or JSON config files."""
 
 import argparse
 import json
@@ -448,6 +448,11 @@ class RepoBatchUpdateError(RepoBatchError):
         super().__init__(failures, operation="update")
 
 
+class RepoBatchExecuteError(RepoBatchError):
+    def __init__(self, failures: Sequence[Tuple[RepoSpec, Exception]]) -> None:
+        super().__init__(failures, operation="execution")
+
+
 class SingleValueAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         if getattr(namespace, self.dest, None) is not None:
@@ -511,12 +516,11 @@ class CommandRunner:
                 text=text,
             )
         except FileNotFoundError as exc:
+            if cwd is not None and not os.path.isdir(str(cwd)):
+                raise
             # Python 3.5 subprocess exceptions do not populate filename.
             if exc.filename not in (None, "git"):
                 raise
-            if exc.filename is None and cwd is not None:
-                if not os.path.isdir(str(cwd)):
-                    raise
             msg = "git executable not found; install Git and check PATH"
             raise GitNotFoundError(msg) from exc
 
@@ -849,7 +853,7 @@ class RepoFile(RepoSpec):
 
 
 class RepoInstaller:
-    """Install and update resolved specs through a shared command runner."""
+    """Manage resolved repos and their commands through a shared runner."""
 
     def __init__(self, *, runner: Optional[CommandRunner] = None) -> None:
         if runner is None:
@@ -867,19 +871,26 @@ class RepoInstaller:
         """Attempt every spec, then raise all installation failures together."""
         failures = []
         for spec in specs:
-            commands = None
-            if run_commands:
-                commands = spec.commands
             try:
-                self.install(
-                    spec.repo,
-                    spec.dest,
-                    branch=spec.branch,
-                    depth=spec.depth,
-                    force=force,
-                    dry_run=dry_run,
-                    commands=commands,
-                )
+                if run_commands:
+                    self.install(
+                        spec.repo,
+                        spec.dest,
+                        branch=spec.branch,
+                        depth=spec.depth,
+                        force=force,
+                        dry_run=dry_run,
+                        commands=spec.commands,
+                    )
+                else:
+                    self.prepare(
+                        spec.repo,
+                        spec.dest,
+                        branch=spec.branch,
+                        depth=spec.depth,
+                        force=force,
+                        dry_run=dry_run,
+                    )
             except (
                 OSError,
                 RuntimeError,
@@ -907,16 +918,52 @@ class RepoInstaller:
             raise RepoBatchUpdateError(failures)
 
     def update(self, repo: str, dest: str, *, dry_run: bool = False) -> None:
-        dest = RepoSpec.normalize_dest(dest, os.getcwd())
-        if not os.path.lexists(dest):
-            raise RuntimeError("dest does not exist; install the repo first")
-        if not self.matches_dest(dest, repo):
-            raise RuntimeError("dest is not the requested repo")
+        dest = self.check_installed_dest(repo, dest)
         display_command = self.runner.format_command(["git", "pull"])
         msg = "Command (cwd={}): {}"
         print(msg.format(shlex.quote(dest), display_command), flush=True)
         if not dry_run:
             self.runner.run_git("pull", cwd=dest, check=True)
+
+    def execute_specs(
+        self, specs: Iterable[RepoSpec], *, dry_run: bool = False
+    ) -> None:
+        """Attempt every repo's commands, then report all failures together."""
+        failures = []
+        for spec in specs:
+            try:
+                self.execute(
+                    spec.repo, spec.dest, commands=spec.commands, dry_run=dry_run
+                )
+            except (
+                OSError,
+                RuntimeError,
+                ValueError,
+                subprocess.CalledProcessError,
+            ) as exc:
+                failures.append((spec, exc))
+        if failures:
+            raise RepoBatchExecuteError(failures)
+
+    def execute(
+        self,
+        repo: str,
+        dest: str,
+        *,
+        commands: Sequence[RepoCommand] = (),
+        dry_run: bool = False
+    ) -> None:
+        self.check_installed_dest(repo, dest)
+        self.execute_commands(commands, dry_run=dry_run)
+
+    def check_installed_dest(self, repo: str, dest: str) -> str:
+        """Return the normalized dest after checking the installed repo."""
+        dest = RepoSpec.normalize_dest(dest, os.getcwd())
+        if not os.path.lexists(dest):
+            raise RuntimeError("dest does not exist; install the repo first")
+        if not self.matches_dest(dest, repo):
+            raise RuntimeError("dest is not the requested repo")
+        return dest
 
     def read_origin_url(self, dest: str) -> Optional[str]:
         """Select Git's effective origin URL without applying address rewriting."""
@@ -982,15 +1029,12 @@ class RepoInstaller:
         dest: str,
         *,
         branch: Optional[str] = None,
-        depth: Optional[int] = None,
-        commands: Optional[Sequence[RepoCommand]] = None
+        depth: Optional[int] = None
     ) -> None:
         git_command = self.clone_command(repo, dest, branch=branch, depth=depth)
         display_command = self.runner.format_command(git_command)
         print(display_command, flush=True)
         self.runner.run_git(*git_command[1:], check=True)
-        if commands is not None:
-            self.execute_commands(commands)
 
     @staticmethod
     def check_replace_dest(dest: str) -> None:
@@ -1052,8 +1096,7 @@ class RepoInstaller:
         dest: str,
         *,
         branch: Optional[str] = None,
-        depth: Optional[int] = None,
-        commands: Optional[Sequence[RepoCommand]] = None
+        depth: Optional[int] = None
     ) -> None:
         # Keep the old dest in a sibling backup while cloning into the final dest.
         self.check_replace_dest(dest)
@@ -1098,9 +1141,6 @@ class RepoInstaller:
                 pending_error=pending_error,
             )
         print("Replaced: {}".format(dest), flush=True)
-        # Initialization failures must not enter the replacement rollback/cleanup.
-        if commands is not None:
-            self.execute_commands(commands)
 
     def execute_commands(
         self, commands: Sequence[RepoCommand], *, dry_run: bool = False
@@ -1125,6 +1165,34 @@ class RepoInstaller:
         dry_run: bool = False,
         commands: Optional[Sequence[RepoCommand]] = None
     ) -> None:
+        """Prepare a repo and run commands for new installs or explicit force."""
+        dest = RepoSpec.normalize_dest(dest, os.getcwd())
+        existed = os.path.lexists(dest)
+        should_execute = bool(commands) and (force or not existed)
+        if should_execute:
+            execute_dest = RepoSpec.canonical_path(dest, os.getcwd())
+        self.prepare(
+            repo, dest, branch=branch, depth=depth, force=force, dry_run=dry_run
+        )
+        if not should_execute:
+            return
+        if dry_run:
+            # The planned clone may not exist yet; prepare already checked dest.
+            self.execute_commands(commands, dry_run=True)
+        else:
+            self.execute(repo, execute_dest, commands=commands)
+
+    def prepare(
+        self,
+        repo: str,
+        dest: str,
+        *,
+        branch: Optional[str] = None,
+        depth: Optional[int] = None,
+        force: bool = False,
+        dry_run: bool = False
+    ) -> None:
+        """Clone or replace a repo as needed, without running commands."""
         dest = RepoSpec.normalize_dest(dest, os.getcwd())
         exists = os.path.lexists(dest)
         if exists and self.matches_dest(dest, repo):
@@ -1141,13 +1209,11 @@ class RepoInstaller:
             git_command = self.clone_command(repo, dest, branch=branch, depth=depth)
             display_command = self.runner.format_command(git_command)
             print(display_command, flush=True)
-            if commands is not None:
-                self.execute_commands(commands, dry_run=True)
             return
         if exists:
-            self.replace(repo, dest, branch=branch, depth=depth, commands=commands)
+            self.replace(repo, dest, branch=branch, depth=depth)
         else:
-            self.clone(repo, dest, branch=branch, depth=depth, commands=commands)
+            self.clone(repo, dest, branch=branch, depth=depth)
 
 
 def positive_int(value: str) -> int:
@@ -1188,10 +1254,6 @@ def repo_install(
     )
 
 
-def repo_execute(repo_file: RepoFile):
-    pass
-
-
 def cmd_install(args: argparse.Namespace) -> None:
     repo_install(
         args.repos,
@@ -1228,6 +1290,29 @@ def cmd_update(args: argparse.Namespace) -> None:
     )
 
 
+def repo_execute(
+    inputs: Sequence[str],
+    *,
+    base_dir: Optional[str] = None,
+    base_url: Optional[str] = None,
+    dry_run: bool = False
+) -> None:
+    """Resolve all inputs before executing commands in installed repos."""
+    repo_file = RepoFile(base_dir=base_dir, base_url=base_url)
+    repo_file.load_from_cmd(inputs)
+    installer = RepoInstaller()
+    installer.execute_specs(repo_file.iter_specs(), dry_run=dry_run)
+
+
+def cmd_execute(args: argparse.Namespace) -> None:
+    repo_execute(
+        args.repos,
+        base_dir=args.base_dir,
+        base_url=args.base_url,
+        dry_run=args.dry_run,
+    )
+
+
 def repo_error_exit_code(error: Exception) -> int:
     """Map a repo operation failure to its CLI exit status."""
     while isinstance(error, RepoReplaceError):
@@ -1244,7 +1329,7 @@ def repo_error_exit_code(error: Exception) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Install and update Git repos from URLs, paths or JSON config files."
+        description="Manage Git repos and their commands from URLs, paths or JSON configs."
     )
     parser.set_defaults(func=None)
     commands = parser.add_subparsers(dest="command")
@@ -1282,7 +1367,7 @@ def main() -> int:
         "-f",
         "--force",
         action="store_true",
-        help="replace a dest that is not the requested repo",
+        help="replace a mismatched dest; install also reruns commands in matching repos",
     )
     prepare = commands.add_parser(
         "prepare",
@@ -1305,6 +1390,13 @@ def main() -> int:
         help="run git pull in installed repos",
     )
     update.set_defaults(func=cmd_update)
+    execute = commands.add_parser(
+        "execute",
+        aliases=["e"],
+        parents=[repo_options],
+        help="run configured commands in installed repos",
+    )
+    execute.set_defaults(func=cmd_execute)
     args, extra_inputs = parser.parse_known_args()
     if extra_inputs:
         # Python 3.5 argparse leaves repos after interspersed options unparsed.
