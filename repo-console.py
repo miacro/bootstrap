@@ -1188,6 +1188,10 @@ def repo_install(
     )
 
 
+def repo_execute(repo_file: RepoFile):
+    pass
+
+
 def cmd_install(args: argparse.Namespace) -> None:
     repo_install(
         args.repos,

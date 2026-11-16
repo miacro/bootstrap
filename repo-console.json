@@ -6,23 +6,30 @@
   "repos": [
     {
       "repo": "utils",
-      "dest": "~/bin/utils"
+      "commands": [{
+        "cwd": "./repos/utils",
+        "cmd": "make reinstall"
+      }]
     },
     {
       "repo": "emacs.d",
-      "dest": "~/.emacs.d"
+      "commands": [{
+        "cwd": "$dest",
+        "cmd": "make reinstall"
+      }]
     },
     {
       "repo": "vim.d",
-      "dest": "~/.vim"
+      "commands": [{
+        "cwd": "$dest",
+        "cmd": "make all"
+      }]
     },
     {
-      "repo": "stumpwm.d",
-      "dest": "~/.stumpwm.d"
+      "repo": "stumpwm.d"
     },
     {
-      "repo": "bootstrap",
-      "dest": "~/bootstrap"
+      "repo": "bootstrap"
     },
     {
       "repo": "profiles"
